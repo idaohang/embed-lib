@@ -1,4 +1,3 @@
-- Seg fault in BMP085 async test still???
-- Add reset methods to BMP085 class
+- Add reset to BMP085 test interfaces
 - Add more GUI interface for setting sea-level pressure
 - Do the metar thing??

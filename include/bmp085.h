@@ -42,6 +42,7 @@ class BMP085
     // Initialize
     bool init (bool _async);
     void destroy();
+    void reset ();
 
     // Set and get functions for OSSR setting
     OSSR_SETTING getOSSR () {return m_ossr;}
@@ -156,6 +157,7 @@ class BMP085
     static void eocIntHandler (void* _data);
 
     // Private helper functions
+    void readDeviceParams();
     uint8_t readReg (const uint8_t _reg);
     void writeReg (const uint8_t _reg, const uint8_t _val);
 };

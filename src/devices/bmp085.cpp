@@ -61,19 +61,7 @@ bool BMP085::init (bool _async)
         usleep(1000);
     }
 
-    // Read device params from EEPROM
-    m_AC1 = ((readReg (AC1_MSB_REG) << 8) | readReg (AC1_LSB_REG));
-    m_AC2 = ((readReg (AC2_MSB_REG) << 8) | readReg (AC2_LSB_REG));
-    m_AC3 = ((readReg (AC3_MSB_REG) << 8) | readReg (AC3_LSB_REG));
-    m_AC4 = ((readReg (AC4_MSB_REG) << 8) | readReg (AC4_LSB_REG));
-    m_AC5 = ((readReg (AC5_MSB_REG) << 8) | readReg (AC5_LSB_REG));
-    m_AC6 = ((readReg (AC6_MSB_REG) << 8) | readReg (AC6_LSB_REG));
-    m_B1 = ((readReg (B1_MSB_REG) << 8) | readReg (B1_LSB_REG));
-    m_B2 = ((readReg (B2_MSB_REG) << 8) | readReg (B2_LSB_REG));
-    m_B1 = ((readReg (B1_MSB_REG) << 8) | readReg (B1_LSB_REG));
-    m_MB = ((readReg (MB_MSB_REG) << 8) | readReg (MB_LSB_REG));
-    m_MC = ((readReg (MC_MSB_REG) << 8) | readReg (MC_LSB_REG));
-    m_MD = ((readReg (MD_MSB_REG) << 8) | readReg (MD_LSB_REG));
+    readDeviceParams();
 
     if (_async)
     {
@@ -106,7 +94,31 @@ void BMP085::destroy ()
     if (m_xclr != NULL)
         m_xclr->digitalWrite(0);
 
+    m_listeners.clear();
+
     m_initialized = false;
+}
+
+void BMP085::reset ()
+{
+    if (m_async)
+        m_eoc->detachInterrupt(eocIntHandler);
+
+    if (m_xclr != NULL)
+    {
+        // Active low reset
+        m_xclr->digitalWrite(0);
+        // Requires 1us pulse
+        usleep(1);
+        m_xclr->digitalWrite(1);
+        // Wait for device to come out of reset
+        usleep(1000);
+    }
+
+    readDeviceParams();
+
+    if (m_async)
+        m_eoc->attachInterrupt(eocIntHandler, GPIO::RISING, this);
 }
 
 int16_t BMP085::readRawTempSync ()
@@ -266,6 +278,23 @@ void BMP085::eocIntHandler (void * _data)
             break;
         }
     }
+}
+
+void BMP085::readDeviceParams ()
+{
+    // Read device params from EEPROM
+    m_AC1 = ((readReg (AC1_MSB_REG) << 8) | readReg (AC1_LSB_REG));
+    m_AC2 = ((readReg (AC2_MSB_REG) << 8) | readReg (AC2_LSB_REG));
+    m_AC3 = ((readReg (AC3_MSB_REG) << 8) | readReg (AC3_LSB_REG));
+    m_AC4 = ((readReg (AC4_MSB_REG) << 8) | readReg (AC4_LSB_REG));
+    m_AC5 = ((readReg (AC5_MSB_REG) << 8) | readReg (AC5_LSB_REG));
+    m_AC6 = ((readReg (AC6_MSB_REG) << 8) | readReg (AC6_LSB_REG));
+    m_B1 = ((readReg (B1_MSB_REG) << 8) | readReg (B1_LSB_REG));
+    m_B2 = ((readReg (B2_MSB_REG) << 8) | readReg (B2_LSB_REG));
+    m_B1 = ((readReg (B1_MSB_REG) << 8) | readReg (B1_LSB_REG));
+    m_MB = ((readReg (MB_MSB_REG) << 8) | readReg (MB_LSB_REG));
+    m_MC = ((readReg (MC_MSB_REG) << 8) | readReg (MC_LSB_REG));
+    m_MD = ((readReg (MD_MSB_REG) << 8) | readReg (MD_LSB_REG));
 }
 
 uint8_t BMP085::readReg (const uint8_t _reg)
