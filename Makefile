@@ -4,32 +4,42 @@
 #
 
 CXX := g++
-SRCDIR := src
-BUILDDIR := build
-TARGET := lib/libembed.so
-TESTS := 
-
-INCLUDE := -I include
-CPPFLAGS := $(INCLUDE)
-CXXFLAGS := -Wall -fPIC
-LDLIBS = 
-LDFLAGS := -Llib -shared
-
 SRCEXT := cpp
-SOURCES := $(notdir $(shell find $(SRCDIR) -type f -name *.$(SRCEXT)))
-OBJECTS := $(addprefix $(BUILDDIR)/, $(SOURCES:.$(SRCEXT)=.o))
+SRCDIR := src
+TESTDIR := test
+BUILDDIR := build
+LIBDIR := lib
+BINDIR := bin
+TARGET := $(LIBDIR)/libembed.so
 
-VPATH = $(shell find $(SRCDIR)/* -type d)
+TARGET_INCLUDE := -I include
+TARGET_CPPFLAGS := $(TARGET_INCLUDE)
+TARGET_CXXFLAGS := -Wall -fPIC
+TARGET_LDLIBS = 
+TARGET_LDFLAGS := -L$(LIBDIR) -shared
 
-all: $(TARGET)
+TARGET_SOURCES := $(notdir $(shell find $(SRCDIR) -type f -name *.$(SRCEXT)))
+TARGET_OBJECTS := $(addprefix $(BUILDDIR)/, $(TARGET_SOURCES:.$(SRCEXT)=.o))
 
-$(TARGET): $(OBJECTS)
-	$(CXX) $(LDFLAGS) -o $@ $(OBJECTS) $(LOADLIBS)
+VPATH = $(shell find $(SRCDIR)/* -type d) $(shell find $(TESTDIR)/* -type d)
 
-$(BUILDDIR)/%.o: %.$(SRCEXT)
-	$(CXX) $^ -c -o $@ $(CPPFLAGS) $(CXXFLAGS)
+all: embed
+
+embed: $(TARGET)
+
+$(TARGET): $(TARGET_OBJECTS)
+	$(CXX) $(TARGET_LDFLAGS) -o $@ $(TARGET_OBJECTS) $(TARGET_LOADLIBS)
 
 clean:
-	rm -rf $(BUILDDIR)/* $(TARGET)
+	rm -rf $(BUILDDIR)/* $(LIBDIR)/* $(BINDIR)/*
 
 .PHONY: clean
+
+include $(TESTDIR)/Makefile.in
+
+tests: $(TESTS)
+
+$(BUILDDIR)/%.o: %.$(SRCEXT)
+	$(if $(findstring src/,$^), \
+		$(CXX) $^ -c -o $@ $(TARGET_CPPFLAGS) $(TARGET_CXXFLAGS), \
+		$(CXX) $^ -c -o $@ $(TEST_CPPFLAGS) $(TEST_CXXFLAGS))

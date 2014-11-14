@@ -1,0 +1,12 @@
+BBB_BMP085_SYNC_TEST := $(BINDIR)/bbb_bmp085_sync_test
+BBB_BMP085_SYNC_TEST_OBJECTS := $(BUILDDIR)/bbb_bmp085_sync_test.o $(BUILDDIR)/screen.o
+$(BBB_BMP085_SYNC_TEST): $(BBB_BMP085_SYNC_TEST_OBJECTS)  embed
+	$(CXX) $(TEST_LDFLAGS) -o $(BBB_BMP085_SYNC_TEST) $(BBB_BMP085_SYNC_TEST_OBJECTS) $(TEST_LDLIBS)
+bbb_bmp085_sync_test: $(BBB_BMP085_SYNC_TEST)
+.PHONY: bbb_bmp085_sync_test
+BBB_BMP085_TESTS += bbb_bmp085_sync_test
+
+# Add more tests here
+
+bbb_bmp085_tests: $(BBB_BMP085_TESTS)
+BBB_TESTS += $(BBB_BMP085_TESTS)

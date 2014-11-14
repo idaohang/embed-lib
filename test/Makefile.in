@@ -1,0 +1,7 @@
+TEST_INCLUDE := -I include -I test/include
+TEST_CPPFLAGS := $(TEST_INCLUDE)
+TEST_CXXFLAGS := -Wall
+TEST_LDLIBS = -lncurses -lembed
+TEST_LDFLAGS := -L$(LIBDIR)
+
+include $(TESTDIR)/bbb/Makefile.in
