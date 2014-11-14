@@ -26,3 +26,13 @@
 *.exe
 *.out
 *.app
+
+# Ignore the build and lib dirs
+build/*
+!build/.keep
+lib/*
+!lib/.keep
+
+# Ignore any executables
+bin/*
+!bin/.keep
