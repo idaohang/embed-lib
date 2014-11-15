@@ -1,3 +1,6 @@
+- Create write test for GPIO
+- Create attachInterupt and detachInterrupt for GPIO
+    - Add a threading class for the GPIO to take in
 - Add support for interrupts into BMP085 (make it less overhead with callbacks)
     - Add interrupt interface and interrupt class for BBB
 - Clean up BMP085 class and make sure it only does what it has too
