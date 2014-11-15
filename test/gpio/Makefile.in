@@ -1,0 +1,20 @@
+BBB_GPIO_READ_TEST := $(BINDIR)/bbb_gpio_read_test
+BBB_GPIO_READ_TEST_OBJECTS := $(BUILDDIR)/bbb_gpio_read_test.o $(BUILDDIR)/screen.o
+$(BUILDDIR)/bbb_gpio_read_test.o: $(TESTDIR)/gpio/read_test/gpio_read_test.cpp
+	$(CXX) $^ -c -o $@ $(TEST_CPPFLAGS) $(TEST_CXXFLAGS) -DBEAGLEBONEBLACK
+$(BBB_GPIO_READ_TEST): $(BBB_GPIO_READ_TEST_OBJECTS) embed
+	$(CXX) $(TEST_LDFLAGS) -o $(BBB_GPIO_READ_TEST) $(BBB_GPIO_READ_TEST_OBJECTS) $(TEST_LDLIBS)
+bbb_gpio_read_test: $(BBB_GPIO_READ_TEST)
+.PHONY: bbb_gpio_read_test
+BBB_GPIO_TESTS += bbb_gpio_read_test
+
+# Add more tests here
+
+bbb_gpio_tests: $(BBB_GPIO_TESTS)
+BBB_TESTS += bbb_gpio_tests
+
+GPIO_TESTS += $(BBB_GPIO_TESTS)
+
+gpio_tests: $(GPIO_TESTS)
+
+TESTS += $(GPIO_TESTS)

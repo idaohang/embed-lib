@@ -78,7 +78,7 @@ int main (int argc, char *argv[])
     // Relative altitude variables
     double referenceAltitude = 0;
 
-    // Line content defintionsdefinitions
+    // Line content defintions
     typedef enum LINE_CONTENT_ENUM
     {
         BORDER_TOP_LINE = 0,
@@ -101,7 +101,7 @@ int main (int argc, char *argv[])
 
     // Print static text to screen
     char buf[width];
-    Screen::Instance()->printTextCenter(0, width - 1, TITLE_LINE, "Quadcopter Prototyping: BMP085 Test");
+    Screen::Instance()->printTextCenter(0, width - 1, TITLE_LINE, "embed-lib: BMP085 Test");
     Screen::Instance()->printHLine (0, width - 1, TITLE_SEP_LINE);
     sprintf(buf,                                     " Filter: %8s    Filter Type: %20s", "Disabled", "N/A");
     Screen::Instance()->printText(1, OPTIONS_LINE, buf);

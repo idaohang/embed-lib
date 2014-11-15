@@ -5,3 +5,4 @@ TEST_LDLIBS = -lncurses -lembed
 TEST_LDFLAGS := -L$(LIBDIR)
 
 include $(TESTDIR)/bbb/Makefile.in
+include $(TESTDIR)/gpio/Makefile.in
