@@ -1,5 +1,0 @@
-include $(TESTDIR)/bbb/bmp085/Makefile.in
-
-bbb_tests: $(BBB_TESTS)
-
-TESTS += $(BBB_TESTS)

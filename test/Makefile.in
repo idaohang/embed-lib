@@ -4,5 +4,7 @@ TEST_CXXFLAGS := -Wall
 TEST_LDLIBS = -lncurses -lembed
 TEST_LDFLAGS := -L$(LIBDIR)
 
-include $(TESTDIR)/bbb/Makefile.in
+include $(TESTDIR)/bmp085/Makefile.in
 include $(TESTDIR)/gpio/Makefile.in
+
+bbb_tests: $(BBB_TESTS)

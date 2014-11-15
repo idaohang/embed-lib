@@ -1,5 +1,5 @@
 /*
- * Filename: bbb_bmp085_sync_test.cpp
+ * Filename: bmp085_sync_test.cpp
  * Date Created: 11/13/2014
  * Author: Michael McKeown
  * Description: A test program that prints values received from the BMP085
@@ -28,11 +28,22 @@ int main (int argc, char *argv[])
     Screen::Instance()->size(width, height);
 
     // Initialize I2C bus
-    BBBI2C     devBus(1);
-    devBus.init();
+    I2C*       devBus = NULL;
+#ifdef BEAGLEBONEBLACK
+    devBus = new BBBI2C(1);
+#endif
+
+    if (devBus == NULL)
+    {
+        fprintf(stderr, "Error: No target device was specified when compiling this test\n");
+        Screen::Instance()->destroy();
+        return 1;
+    }
+
+    devBus->init();
 
     // Initialize BMP device, passing it the I2C bus
-    BMP085  device(&devBus);
+    BMP085  device(devBus);
     device.init();
     device.setOSSR(BMP085::OSSR_ULTRA_HIGH_RES);
 
@@ -101,7 +112,9 @@ int main (int argc, char *argv[])
 
     // Print static text to screen
     char buf[width];
-    Screen::Instance()->printTextCenter(0, width - 1, TITLE_LINE, "embed-lib: BMP085 Test");
+#ifdef BEAGLEBONEBLACK
+    Screen::Instance()->printTextCenter(0, width - 1, TITLE_LINE, "embed-lib: BeagleBone Black BMP085 Test");
+#endif
     Screen::Instance()->printHLine (0, width - 1, TITLE_SEP_LINE);
     sprintf(buf,                                     " Filter: %8s    Filter Type: %20s", "Disabled", "N/A");
     Screen::Instance()->printText(1, OPTIONS_LINE, buf);
@@ -167,7 +180,7 @@ int main (int argc, char *argv[])
                                                                             sampleRateFilterSize);
                                 break;
                             default:
-                                devBus.destroy();
+                                devBus->destroy();
                                 Screen::Instance()->destroy();
                                 fprintf(stderr, "Error: Invalid filter type\n");
                                 return 1;
@@ -224,7 +237,7 @@ int main (int argc, char *argv[])
                                                                     sampleRateFilterSize);
                         break;
                     default:
-                        devBus.destroy();
+                        devBus->destroy();
                         Screen::Instance()->destroy();
                         fprintf(stderr, "Error: Invalid filter type\n");
                         return 1;
@@ -361,7 +374,8 @@ int main (int argc, char *argv[])
     if (sampleRateFilter != NULL)
         delete sampleRateFilter;
 
-    devBus.destroy();
+    devBus->destroy();
+    delete devBus;
 
     Screen::Instance()->destroy();
 
