@@ -1,8 +1,8 @@
 /*
- * Filename: gpio_read_test.cpp
+ * Filename: gpio_write_test.cpp
  * Date Created: 11/15/2014
  * Author Michael McKeown
- * Description: A test program that prints the value of a GPIO
+ * Description: A test program that writes values to a GPIO
  */
 
 #include "gpio.h"
@@ -46,7 +46,7 @@ int main(int argc, char * argv[])
         Screen::Instance()->destroy();
         return 1;
     }
-    gpio->setMode(GPIO::INPUT);
+    gpio->setMode(GPIO::OUTPUT);
 
     // Line content definitions
     typedef enum LINE_CONTENT_ENUM
@@ -54,9 +54,6 @@ int main(int argc, char * argv[])
         BORDER_TOP_LINE = 0,
         TITLE_LINE,
         TITLE_SEP_LINE,
-        BLANK0,
-        GPIO_LINE,
-        BLANK1,
         CONTROLS_LINE,
         BORDER_BOT_LINE
     } LINE_CONTENT;
@@ -65,25 +62,26 @@ int main(int argc, char * argv[])
     Screen::Instance()->printRectangle(0, BORDER_TOP_LINE, width - 1, BORDER_BOT_LINE);
 
     // Print static text to screen
-    char buf[64];
 #ifdef BEAGLEBONEBLACK
-    Screen::Instance()->printTextCenter(0, width - 1, TITLE_LINE, "embed-lib: BeagleBone Black GPIO Read Test");
+    Screen::Instance()->printTextCenter(0, width - 1, TITLE_LINE, "embed-lib: BeagleBone Black GPIO Write Test");
 #endif
     Screen::Instance()->printHLine (0, width - 1, TITLE_SEP_LINE);
-    snprintf(buf, sizeof(buf), " GPIO_%d Value: ", gpioPin);
-    Screen::Instance()->printText (1, GPIO_LINE, buf);
-    Screen::Instance()->printText(1, CONTROLS_LINE, " q - Quit");
-
-    // Constants for updating GUI
-    const int32_t VALUE_OFFSET = 17;
+    Screen::Instance()->printText(1, CONTROLS_LINE, "s - Set    r - Reset     q - Quit");
 
     // Main loop
     char c;
     while ((c = (Screen::Instance()->getCh())) != 'q')
     {
-        uint8_t val = gpio->digitalRead();
-        snprintf(buf, sizeof(buf), "%d", val);
-        Screen::Instance()->printText(VALUE_OFFSET, GPIO_LINE, buf);
+        switch (c)
+        {
+            case 's' :
+                gpio->digitalWrite(1);
+                break;
+            case 'r' :
+                gpio->digitalWrite(0);
+            default:
+                break;
+        }
     }
 
     gpio->destroy();

@@ -117,6 +117,7 @@ void BBBGPIO::setMode (const GPIO::PIN_DIR _dir)
                 close (fd);
                 return;
             }
+            break;
         default:
             fprintf(stderr, "BBBGPIO::setMode called with unknown PIN_MODE\n");
             close (fd);
