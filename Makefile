@@ -15,7 +15,7 @@ TARGET := $(LIBDIR)/libembed.so
 TARGET_INCLUDE := -I include
 TARGET_CPPFLAGS := $(TARGET_INCLUDE)
 TARGET_CXXFLAGS := -Wall -fPIC
-TARGET_LDLIBS = 
+TARGET_LDLIBS :=
 TARGET_LDFLAGS := -L$(LIBDIR) -shared
 
 TARGET_SOURCES := $(notdir $(shell find $(SRCDIR) -type f -name *.$(SRCEXT)))

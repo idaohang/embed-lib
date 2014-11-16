@@ -18,6 +18,16 @@ bbb_gpio_write_test: $(BBB_GPIO_WRITE_TEST)
 .PHONY: bbb_gpio_write_test
 BBB_GPIO_TESTS += bbb_gpio_write_test
 
+BBB_GPIO_INT_TEST := $(BINDIR)/bbb_gpio_int_test
+BBB_GPIO_INT_TEST_OBJECTS := $(BUILDDIR)/bbb_gpio_int_test.o $(BUILDDIR)/screen.o
+$(BUILDDIR)/bbb_gpio_int_test.o: $(TESTDIR)/gpio/int_test/gpio_int_test.cpp
+	$(CXX) $^ -c -o $@ $(TEST_CPPFLAGS) $(TEST_CXXFLAGS) -DBEAGLEBONEBLACK
+$(BBB_GPIO_INT_TEST): $(BBB_GPIO_INT_TEST_OBJECTS) embed
+	$(CXX) $(TEST_LDFLAGS) -o $(BBB_GPIO_INT_TEST) $(BBB_GPIO_INT_TEST_OBJECTS) $(TEST_LDLIBS)
+bbb_gpio_int_test: $(BBB_GPIO_INT_TEST)
+.PHONY: bbb_gpio_int_test
+BBB_GPIO_TESTS += bbb_gpio_int_test
+
 bbb_gpio_tests: $(BBB_GPIO_TESTS)
 BBB_TESTS += bbb_gpio_tests
 
