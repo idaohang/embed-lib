@@ -33,7 +33,10 @@ template <class T> void ExpAvgFilter<T>::reset()
 
 template <class T> void ExpAvgFilter<T>::addValue (T _val)
 {
-    m_sT = (m_alpha * _val) + ((1.0 - m_alpha) * m_sT);
+    if (m_sampleCount == 0)
+        m_sT = _val;
+    else
+        m_sT = (m_alpha * _val) + ((1.0 - m_alpha) * m_sT);
 
     if (m_sampleCount < m_numSamples)
     {

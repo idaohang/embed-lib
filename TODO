@@ -1,3 +1,4 @@
 - Add support for interrupts into BMP085 (make it less overhead with callbacks)
+- Add reset methods to BMP085 class
 - Clean up BMP085 class and make sure it only does what it has too
 - Do the metar thing??

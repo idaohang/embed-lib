@@ -10,6 +10,9 @@
 #include <map>
 
 #include "bmp085.h"
+#include "gpio.h"
+#include "i2c.h"
+#include "bbb_gpio.h"
 #include "bbb_i2c.h"
 #include "avg_filter.h"
 #include "simple_avg_filter.h"
@@ -27,6 +30,27 @@ int main (int argc, char *argv[])
     int32_t width, height;
     Screen::Instance()->size(width, height);
 
+    // Initialize XCLR GPIO
+    GPIO*      xclrGPIO = NULL;
+#ifdef BEAGLEBONEBLACK
+    xclrGPIO = new BBBGPIO(115);
+#endif
+
+    if (xclrGPIO == NULL)
+    {
+        fprintf(stderr, "Error: No target device was specified when compiling this test\n");
+        Screen::Instance()->destroy();
+        return 1;
+    }
+
+    if (!xclrGPIO->init())
+    {
+        fprintf(stderr, "Error: Initializing XCLR GPIO\n");
+        Screen::Instance()->destroy();
+        return 1;
+    }
+    xclrGPIO->setMode(GPIO::OUTPUT);
+
     // Initialize I2C bus
     I2C*       devBus = NULL;
 #ifdef BEAGLEBONEBLACK
@@ -36,15 +60,33 @@ int main (int argc, char *argv[])
     if (devBus == NULL)
     {
         fprintf(stderr, "Error: No target device was specified when compiling this test\n");
+        xclrGPIO->destroy();
+        delete xclrGPIO;
         Screen::Instance()->destroy();
         return 1;
     }
 
-    devBus->init();
+    if (!devBus->init())
+    {
+        fprintf(stderr, "Error: Initializing I2C bus\n");
+        xclrGPIO->destroy();
+        delete xclrGPIO;
+        Screen::Instance()->destroy();
+        return 1;
+    }
 
-    // Initialize BMP device, passing it the I2C bus
-    BMP085  device(devBus);
-    device.init();
+    // Initialize BMP device, passing it the I2C bus and XCLR GPIO
+    BMP085  device(devBus, NULL, xclrGPIO);
+    if (!device.init(false))
+    {
+        fprintf(stderr, "Error: Initializing BMP085 device\n");
+        devBus->destroy();
+        delete devBus;
+        xclrGPIO->destroy();
+        delete xclrGPIO;
+        Screen::Instance()->destroy();
+        return 1;
+    }
     device.setOSSR(BMP085::OSSR_ULTRA_HIGH_RES);
 
     // Sample rate variables
@@ -58,14 +100,18 @@ int main (int argc, char *argv[])
     AvgFilter<double>* sampleRateFilter = NULL;
 
     // Filter parametes
-    const int32_t pressFilterSize = 18;
-    const int32_t absAltFilterSize = 18;
-    const int32_t relAltFilterSize = 18;
-    const int32_t sampleRateFilterSize = 18;
-    const double pressFilterAlpha = 0.75;
-    const double absAltFilterAlpha = 0.75;
-    const double relAltFilterAlpha = 0.75;
-    const double sampleRateFilterAlpha = 0.75;
+    const int32_t pressFilterSize = 48;
+    const int32_t absAltFilterSize = 48;
+    const int32_t relAltFilterSize = 48;
+    const int32_t sampleRateFilterSize = 48;
+    const int32_t pressFilterStdDevInterval = 300;
+    const int32_t absAltFilterStdDevInterval = 300;
+    const int32_t relAltFilterStdDevInterval = 300;
+    const int32_t sampleRateFilterStdDevInterval = 300;
+    const double pressFilterAlpha = 0.25;
+    const double absAltFilterAlpha = 0.25;
+    const double relAltFilterAlpha = 0.25;
+    const double sampleRateFilterAlpha = 0.25;
 
     // Filter type multiplexing
     typedef enum FILTER_TYPES_ENUM
@@ -173,11 +219,14 @@ int main (int argc, char *argv[])
                                 sampleRateFilter = new SimpleAvgFilter<double>(sampleRateFilterSize);
                                 break;
                             case EXP_AVG_FILTER :
-                                pressFilter = new ExpAvgFilter<double>(pressFilterAlpha, pressFilterSize);
-                                absAltFilter = new ExpAvgFilter<double>(absAltFilterAlpha, absAltFilterSize);
-                                relAltFilter = new ExpAvgFilter<double>(relAltFilterAlpha, relAltFilterSize);
+                                pressFilter = new ExpAvgFilter<double>(pressFilterAlpha,
+                                                                       pressFilterStdDevInterval);
+                                absAltFilter = new ExpAvgFilter<double>(absAltFilterAlpha,
+                                                                        absAltFilterStdDevInterval);
+                                relAltFilter = new ExpAvgFilter<double>(relAltFilterAlpha,
+                                                                        relAltFilterStdDevInterval);
                                 sampleRateFilter = new ExpAvgFilter<double>(sampleRateFilterAlpha,
-                                                                            sampleRateFilterSize);
+                                                                            sampleRateFilterStdDevInterval);
                                 break;
                             default:
                                 devBus->destroy();
@@ -230,11 +279,11 @@ int main (int argc, char *argv[])
                         sampleRateFilter = new SimpleAvgFilter<double>(sampleRateFilterSize);
                         break;
                     case EXP_AVG_FILTER :
-                        pressFilter = new ExpAvgFilter<double>(pressFilterAlpha, pressFilterSize);
-                        absAltFilter = new ExpAvgFilter<double>(absAltFilterAlpha, absAltFilterSize);
-                        relAltFilter = new ExpAvgFilter<double>(relAltFilterAlpha, relAltFilterSize);
+                        pressFilter = new ExpAvgFilter<double>(pressFilterAlpha, pressFilterStdDevInterval);
+                        absAltFilter = new ExpAvgFilter<double>(absAltFilterAlpha, absAltFilterStdDevInterval);
+                        relAltFilter = new ExpAvgFilter<double>(relAltFilterAlpha, relAltFilterStdDevInterval);
                         sampleRateFilter = new ExpAvgFilter<double>(sampleRateFilterAlpha,
-                                                                    sampleRateFilterSize);
+                                                                    sampleRateFilterStdDevInterval);
                         break;
                     default:
                         devBus->destroy();
@@ -374,8 +423,13 @@ int main (int argc, char *argv[])
     if (sampleRateFilter != NULL)
         delete sampleRateFilter;
 
+    device.destroy();
+
     devBus->destroy();
     delete devBus;
+
+    xclrGPIO->destroy();
+    delete xclrGPIO;
 
     Screen::Instance()->destroy();
 

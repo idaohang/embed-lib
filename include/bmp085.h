@@ -12,8 +12,10 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <math.h>
+#include <map>
 
 #include "i2c.h"
+#include "gpio.h"
 
 namespace embed
 {
@@ -31,30 +33,15 @@ class BMP085
       OSSR_NUM
     } OSSR_SETTING;
 
-    // Callback typdefs
-    typedef void (*TemperatureCallback)(int16_t _rawTemp, double _tempC, double _tempF);
-    typedef void (*PressureCallback) (int32_t _rawPressure, double _pressurehPa);
-    typedef void (*AltitudeCallback) (double _altitudeM, double _altitudeF);
+    // Interrupt callback
+    typedef void (*EOCIntHandler) (const int16_t _temp, const int32_t _pressure, void* _data);
 
-    // ISRs
-    typedef void (*ISRFunc) (); // should just call BMP085::eocISR
-
-    BMP085 (I2C* _bus);
+    BMP085 (I2C* _bus, GPIO* _eoc = NULL, GPIO* _xclr = NULL);
     ~BMP085 ();
 
-    // Register callbacks
-    void registerTemperatureCallback (TemperatureCallback _cb);
-    void registerPressureCallback (PressureCallback _cb);
-    void registerAltitudeCallback (AltitudeCallback _cb);
-
-    // Initialize for synchronous reading style
-    void init ();
-
-    // Initialize for asynchronous reading style
-    void initAsync (int _eocPin, ISRFunc _eocIsr);
-
-    // ISR functions
-    void eocISR ();
+    // Initialize
+    bool init (bool _async);
+    void destroy();
 
     // Set and get functions for OSSR setting
     OSSR_SETTING getOSSR () {return m_ossr;}
@@ -63,6 +50,10 @@ class BMP085
     // Synchronous poll reads
     int16_t readRawTempSync ();
     int32_t readRawPressureSync ();
+
+    // Register for asynchronous reads
+    void registerListener (EOCIntHandler _handler, void* _data);
+    void unregisterListener (EOCIntHandler);
 
     // Helper functions
     void calcTempPressure (const int16_t _rawTemp, const int32_t _rawPressure,
@@ -122,40 +113,45 @@ class BMP085
     } ASYNC_STATE;
 
     // Whether device parameters are initialized
-    bool                        m_initialized;
+    bool                            m_initialized;
 
     // Device parameters read from EEPROM
-    int16_t                     m_AC1;
-    int16_t                     m_AC2;
-    int16_t                     m_AC3;
-    uint16_t                    m_AC4;
-    uint16_t                    m_AC5;
-    uint16_t                    m_AC6;
-    int16_t                     m_B1;
-    int16_t                     m_B2;
-    int16_t                     m_MB;
-    int16_t                     m_MC;
-    int16_t                     m_MD;
+    int16_t                         m_AC1;
+    int16_t                         m_AC2;
+    int16_t                         m_AC3;
+    uint16_t                        m_AC4;
+    uint16_t                        m_AC5;
+    uint16_t                        m_AC6;
+    int16_t                         m_B1;
+    int16_t                         m_B2;
+    int16_t                         m_MB;
+    int16_t                         m_MC;
+    int16_t                         m_MD;
 
     // I2C bus pointer
-    I2C*                        m_bus;
+    I2C*                            m_bus;
 
     // OSSR setting
-    OSSR_SETTING                m_ossr;
+    OSSR_SETTING                    m_ossr;
 
     // State for asynchronous state machine
-    ASYNC_STATE                 m_state;
+    ASYNC_STATE                     m_state;
 
     // Whether we are in async mode
-    bool                        m_async;
+    bool                            m_async;
 
     // Saved temp value across interrupts for async
-    int16_t                     m_rawTempAsync;
+    int16_t                         m_rawTempAsync;
 
-    // Calbacks for asynchronous operation
-    TemperatureCallback         m_tempCB;
-    PressureCallback            m_pressureCB;
-    AltitudeCallback            m_altitudeCB;
+    // GPIOs
+    GPIO*                           m_eoc;
+    GPIO*                           m_xclr;
+
+    // Async listeners
+    std::map<EOCIntHandler,void*>   m_listeners;
+
+    // Interrupt handler from GPIO
+    static void eocIntHandler (void* _data);
 
     // Private helper functions
     uint8_t readReg (const uint8_t _reg);
