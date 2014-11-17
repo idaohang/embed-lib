@@ -100,18 +100,18 @@ int main (int argc, char *argv[])
     AvgFilter<double>* sampleRateFilter = NULL;
 
     // Filter parametes
-    const int32_t pressFilterSize = 48;
-    const int32_t absAltFilterSize = 48;
-    const int32_t relAltFilterSize = 48;
-    const int32_t sampleRateFilterSize = 48;
-    const int32_t pressFilterStdDevInterval = 300;
-    const int32_t absAltFilterStdDevInterval = 300;
-    const int32_t relAltFilterStdDevInterval = 300;
-    const int32_t sampleRateFilterStdDevInterval = 300;
-    const double pressFilterAlpha = 0.25;
-    const double absAltFilterAlpha = 0.25;
-    const double relAltFilterAlpha = 0.25;
-    const double sampleRateFilterAlpha = 0.25;
+    const int32_t pressFilterSize = 18;
+    const int32_t absAltFilterSize = 18;
+    const int32_t relAltFilterSize = 18;
+    const int32_t sampleRateFilterSize = 18;
+    const int32_t pressFilterStdDevInterval = 18;
+    const int32_t absAltFilterStdDevInterval = 18;
+    const int32_t relAltFilterStdDevInterval = 18;
+    const int32_t sampleRateFilterStdDevInterval = 18;
+    const double pressFilterAlpha = 0.5;
+    const double absAltFilterAlpha = 0.5;
+    const double relAltFilterAlpha = 0.5;
+    const double sampleRateFilterAlpha = 0.5;
 
     // Filter type multiplexing
     typedef enum FILTER_TYPES_ENUM
