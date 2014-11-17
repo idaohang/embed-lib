@@ -24,6 +24,7 @@ using namespace embed;
 struct IntData
 {
     pthread_mutex_t     m_dataMutex;
+    bool                m_val;
     int16_t             m_temp;
     int32_t             m_pressure;
     int32_t             m_samplePeriodus;
@@ -184,7 +185,7 @@ int main (int argc, char *argv[])
     bool useSampleRateFilter = false;
 
     // Relative altitude variables
-    double referenceAltitude = 0;
+    double referenceAltitude = 0.0;
 
     // Line content defintions
     typedef enum LINE_CONTENT_ENUM
@@ -233,11 +234,12 @@ int main (int argc, char *argv[])
     struct timeval ctime;
     pthread_mutex_init(&eocData.m_dataMutex, NULL);
     gettimeofday(&ctime, NULL);
+    eocData.m_val = false;
     eocData.m_lastSampleTimeus = ctime.tv_usec;
     device.registerListener (eocIntHandler, &eocData);
 
     // Main loop
-    bool firstIter = true;
+    bool firstMeas = true;
     char c;
     while((c = (Screen::Instance()->getCh())) != 'q')
     {
@@ -371,11 +373,16 @@ int main (int argc, char *argv[])
         // Atomic read
         pthread_mutex_lock (&eocData.m_dataMutex);
 
+        bool val_data = eocData.m_val;
         int16_t raw_temp = eocData.m_temp;
         int32_t raw_pressure = eocData.m_pressure;
         int32_t sample_period_us = eocData.m_samplePeriodus;
 
         pthread_mutex_unlock (&eocData.m_dataMutex);
+
+        // Don't print if not valid data
+        if (!val_data)
+            continue;
 
         //  Calculate sample rate
         double sample_rate_hz_unfiltered = 1.0 / (sample_period_us / 1000000.0);
@@ -414,11 +421,11 @@ int main (int argc, char *argv[])
             absAltMFilteredStdDev = absAltFilter->getStdDev();
         }
 
-        // Set the reference altitude if this is the first iteration
-        if (firstIter)
+        // Set the reference altitude if this is the first measurement
+        if (firstMeas)
         {
-            referenceAltitude = absAltMUnfiltered;
-            firstIter = false;
+            updateRefAlt = true;
+            firstMeas = false;
         }
 
         if (updateRefAlt)
@@ -521,6 +528,7 @@ void eocIntHandler (const int16_t _temp, const int32_t _pressure, void* _data)
     // Atomic update
     pthread_mutex_lock (&_eocData->m_dataMutex);
 
+    _eocData->m_val = true;
     _eocData->m_temp = _temp;
     _eocData->m_pressure = _pressure;
     _eocData->m_samplePeriodus = sample_period;
