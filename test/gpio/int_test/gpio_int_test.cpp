@@ -81,8 +81,10 @@ int main(int argc, char * argv[])
     // Constants for updating GUI
     const int32_t VALUE_OFFSET = 27;
 
-    // Setup interrupt
-    int32_t intCount = 0;
+    // Setup interrupt (start at -1 because
+    // for some reason in this test an interrupt
+    // occurs whenever it starts)
+    int32_t intCount = -1;
     gpio->attachInterrupt(intHandler, GPIO::RISING, &intCount);
 #ifdef BEAGLEBONEBLACK
     intThread.start();
