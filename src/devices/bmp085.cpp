@@ -54,7 +54,12 @@ bool BMP085::init (bool _async)
 
     // If XCLR pin is connected, need to set it to high (it is active low)
     if (m_xclr != NULL)
+    {
         m_xclr->digitalWrite(1);
+        // Wait for device to come out of reset
+        // (This was causing erroneous values without it)
+        usleep(1000);
+    }
 
     // Read device params from EEPROM
     m_AC1 = ((readReg (AC1_MSB_REG) << 8) | readReg (AC1_LSB_REG));
@@ -130,11 +135,30 @@ int32_t BMP085::readRawPressureSync ()
 
 void BMP085::registerListener (EOCIntHandler _handler, void* _data)
 {
+    if (m_eoc == NULL)
+    {
+        printf("BMP085::registerListener called without a valid EOC GPIO\n");
+        return;
+    }
+
+    // Stop interrupts in case they happen in a different thread
+    // and a std::map is not thread safe
+    m_eoc->detachInterrupt (eocIntHandler);
     m_listeners[_handler] = _data;
+    m_eoc->attachInterrupt (eocIntHandler, GPIO::RISING, this);
 }
 
 void BMP085::unregisterListener (EOCIntHandler _handler)
 {
+    if (m_eoc == NULL)
+    {
+        printf("BMP085::unregisterListener called without a valid EOC GPIO\n");
+        return;
+    }
+
+    // Stop interrupts in case they happen in a different thread
+    // and a std::map is not thread safe
+    m_eoc->detachInterrupt (eocIntHandler);
     std::map<EOCIntHandler,void*>::iterator it;
     for (it = m_listeners.begin(); it != m_listeners.end(); it++)
     {
@@ -143,6 +167,7 @@ void BMP085::unregisterListener (EOCIntHandler _handler)
     }
     if (it != m_listeners.end())
         m_listeners.erase(it);
+    m_eoc->attachInterrupt (eocIntHandler, GPIO::RISING, this);
 }
 
 void BMP085::calcTempPressure (const int16_t _rawTemp, const int32_t _rawPressure,

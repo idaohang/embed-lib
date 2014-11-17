@@ -1,6 +1,6 @@
 /*
- * Filename: bmp085_sync_test.cpp
- * Date Created: 11/13/2014
+ * Filename: bmp085_async_test.cpp
+ * Date Created: 11/17/2014
  * Author: Michael McKeown
  * Description: A test program that prints values received from the BMP085
  *              pressure and temperature sensor.
@@ -21,15 +21,19 @@
 
 using namespace embed;
 
+struct IntData
+{
+    pthread_mutex_t     m_dataMutex;
+    int16_t             m_temp;
+    int32_t             m_pressure;
+    int32_t             m_samplePeriodus;
+    int32_t             m_lastSampleTimeus;
+};
+
+void eocIntHandler (const int16_t _temp, const int32_t pressure, void* _data);
+
 int main (int argc, char *argv[])
 {
-    // Setup TUI
-    if (!Screen::Instance()->init())
-        return 1;
-
-    int32_t width, height;
-    Screen::Instance()->size(width, height);
-
     // Initialize XCLR GPIO
     GPIO*      xclrGPIO = NULL;
 #ifdef BEAGLEBONEBLACK
@@ -39,17 +43,41 @@ int main (int argc, char *argv[])
     if (xclrGPIO == NULL)
     {
         fprintf(stderr, "Error: No target device was specified when compiling this test\n");
-        Screen::Instance()->destroy();
         return 1;
     }
 
     if (!xclrGPIO->init())
     {
         fprintf(stderr, "Error: Initializing XCLR GPIO\n");
-        Screen::Instance()->destroy();
+        delete xclrGPIO;
         return 1;
     }
     xclrGPIO->setMode(GPIO::OUTPUT);
+
+    // Initialize the EOC GPIO
+    GPIO*       eocGPIO = NULL;
+#ifdef BEAGLEBONEBLACK
+    BBBIntThread intThread;
+    eocGPIO = new BBBGPIO (7, &intThread);
+#endif
+
+    if (eocGPIO == NULL)
+    {
+        fprintf(stderr, "Error: No target device was specified when compiling this test\n");
+        xclrGPIO->destroy();
+        delete xclrGPIO;
+        return 1;
+    }
+
+    if (!eocGPIO->init())
+    {
+        fprintf(stderr, "Error: Initializing EOC GPIO\n");
+        delete eocGPIO;
+        xclrGPIO->destroy();
+        delete xclrGPIO;
+        return 1;
+    }
+    eocGPIO->setMode(GPIO::INPUT);
 
     // Initialize I2C bus
     I2C*       devBus = NULL;
@@ -60,38 +88,61 @@ int main (int argc, char *argv[])
     if (devBus == NULL)
     {
         fprintf(stderr, "Error: No target device was specified when compiling this test\n");
+        eocGPIO->destroy();
+        delete eocGPIO;
         xclrGPIO->destroy();
         delete xclrGPIO;
-        Screen::Instance()->destroy();
         return 1;
     }
 
     if (!devBus->init())
     {
         fprintf(stderr, "Error: Initializing I2C bus\n");
+        delete devBus;
+        eocGPIO->destroy();
+        delete eocGPIO;
         xclrGPIO->destroy();
         delete xclrGPIO;
-        Screen::Instance()->destroy();
         return 1;
     }
 
     // Initialize BMP device, passing it the I2C bus and XCLR GPIO
-    BMP085  device(devBus, NULL, xclrGPIO);
-    if (!device.init(false))
+    BMP085  device(devBus, eocGPIO, xclrGPIO);
+    device.setOSSR(BMP085::OSSR_ULTRA_HIGH_RES);
+#ifdef BEAGLEBONEBLACK
+    // For BBB, need to start thread because init kicks
+    // off the first reading and depends on catching the
+    // first interrupt
+    intThread.start();
+#endif
+    if (!device.init(true))
     {
         fprintf(stderr, "Error: Initializing BMP085 device\n");
         devBus->destroy();
         delete devBus;
+        eocGPIO->destroy();
+        delete eocGPIO;
         xclrGPIO->destroy();
         delete xclrGPIO;
-        Screen::Instance()->destroy();
         return 1;
     }
-    device.setOSSR(BMP085::OSSR_ULTRA_HIGH_RES);
 
-    // Sample rate variables
-    struct timeval last_measure, current_measure;
-    gettimeofday(&last_measure, NULL);
+    // Setup TUI
+    if (!Screen::Instance()->init())
+    {
+        fprintf(stderr, "Error: Initializing Screen\n");
+        device.destroy();
+        devBus->destroy();
+        delete devBus;
+        eocGPIO->destroy();
+        delete eocGPIO;
+        xclrGPIO->destroy();
+        delete xclrGPIO;
+        return 1;
+    }
+
+    int32_t width, height;
+    Screen::Instance()->size(width, height);
 
     // Average filters
     AvgFilter<double>* pressFilter = NULL;
@@ -159,7 +210,7 @@ int main (int argc, char *argv[])
     // Print static text to screen
     char buf[width];
 #ifdef BEAGLEBONEBLACK
-    Screen::Instance()->printTextCenter(0, width - 1, TITLE_LINE, "embed-lib: BeagleBone Black BMP085 Synchronous Test");
+    Screen::Instance()->printTextCenter(0, width - 1, TITLE_LINE, "embed-lib: BeagleBone Black BMP085 Asynchronous Test");
 #endif
     Screen::Instance()->printHLine (0, width - 1, TITLE_SEP_LINE);
     sprintf(buf,                                     " Filter: %8s    Filter Type: %20s", "Disabled", "N/A");
@@ -176,6 +227,14 @@ int main (int argc, char *argv[])
     const int32_t VALUE_OFFSET = 29;
     const int32_t FILTER_OFFSET = 10;
     const int32_t FILTER_TYPE_OFFSET = 35;
+
+    // Register interrupt with device
+    struct IntData eocData;
+    struct timeval ctime;
+    pthread_mutex_init(&eocData.m_dataMutex, NULL);
+    gettimeofday(&ctime, NULL);
+    eocData.m_lastSampleTimeus = ctime.tv_usec;
+    device.registerListener (eocIntHandler, &eocData);
 
     // Main loop
     bool firstIter = true;
@@ -309,16 +368,18 @@ int main (int argc, char *argv[])
                 break;
         }
 
-        // Read raw temperature and pressure
-        int16_t raw_temp = device.readRawTempSync();
-        int32_t raw_pressure = device.readRawPressureSync ();
+        // Atomic read
+        pthread_mutex_lock (&eocData.m_dataMutex);
+
+        int16_t raw_temp = eocData.m_temp;
+        int32_t raw_pressure = eocData.m_pressure;
+        int32_t sample_period_us = eocData.m_samplePeriodus;
+
+        pthread_mutex_unlock (&eocData.m_dataMutex);
 
         //  Calculate sample rate
-        gettimeofday(&current_measure, NULL);
-        int32_t sample_period_us = current_measure.tv_usec - last_measure.tv_usec;
         double sample_rate_hz_unfiltered = 1.0 / (sample_period_us / 1000000.0);
         double sample_rate_hz_filtered, sample_rate_hz_filtered_std_dev;
-        memcpy(&last_measure, &current_measure, sizeof(struct timeval));
 
         // Filter sample rate
         if (useSampleRateFilter)
@@ -412,7 +473,13 @@ int main (int argc, char *argv[])
         else
             sprintf (buf, "%9.2fHz", sample_rate_hz_unfiltered);
         Screen::Instance()->printText(VALUE_OFFSET, MEAS_RATE_LINE, buf);
+
+        // Don't need to update screen too fast
+        usleep(100);
     }
+
+    device.unregisterListener (eocIntHandler);
+    pthread_mutex_destroy (&eocData.m_dataMutex);
 
     if (pressFilter != NULL)
         delete pressFilter;
@@ -424,9 +491,15 @@ int main (int argc, char *argv[])
         delete sampleRateFilter;
 
     device.destroy();
+    #ifdef BEAGLEBONEBLACK
+        intThread.end();
+    #endif
 
     devBus->destroy();
     delete devBus;
+
+    eocGPIO->destroy();
+    delete eocGPIO;
 
     xclrGPIO->destroy();
     delete xclrGPIO;
@@ -434,4 +507,24 @@ int main (int argc, char *argv[])
     Screen::Instance()->destroy();
 
     return 0;
+}
+
+void eocIntHandler (const int16_t _temp, const int32_t _pressure, void* _data)
+{
+    struct IntData* _eocData = static_cast<struct IntData*>(_data);
+
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);
+
+    int32_t sample_period = current_time.tv_usec - _eocData->m_lastSampleTimeus;
+
+    // Atomic update
+    pthread_mutex_lock (&_eocData->m_dataMutex);
+
+    _eocData->m_temp = _temp;
+    _eocData->m_pressure = _pressure;
+    _eocData->m_samplePeriodus = sample_period;
+    _eocData->m_lastSampleTimeus = current_time.tv_usec;
+
+    pthread_mutex_unlock (&_eocData->m_dataMutex);
 }

@@ -46,6 +46,7 @@ class BBBGPIO : public GPIO
     PIN_DIR                             m_pinDir;
     BBBIntThread*                       m_intThread;
     std::map<GPIOIntHandler,void*>      m_listeners;
+    pthread_mutex_t                     m_listenersMutex;
     INT_MODE                            m_mode;
     int32_t                             m_valueFd;
 };

@@ -14,7 +14,8 @@ BBBIntThread::BBBIntThread() :
     m_exit (false),
     m_thread(),
     m_fds(),
-    m_fdInfoMap()
+    m_fdInfoMap(),
+    m_mutexFds()
 {
 }
 
@@ -30,6 +31,12 @@ bool BBBIntThread::start()
         return true;
     else if (m_started && m_exit)
         return false;
+
+    if (pthread_mutex_init(&m_mutexFds, NULL) != 0)
+    {
+        fprintf(stderr, "BBB::IntThread::start pthread_mutex_init error\n");
+        return false;
+    }
 
     if (pthread_create(&m_thread, NULL, threadMain, this) != 0)
     {
@@ -59,6 +66,8 @@ void BBBIntThread::end()
     m_exit = true;
     pthread_join(m_thread, NULL);
 
+    pthread_mutex_destroy(&m_mutexFds);
+
     m_started = false;
     m_exit = false;
 }
@@ -72,7 +81,12 @@ void BBBIntThread::registerListener (int32_t _fd, IntHandler _handler, void* _da
     info.m_fd = _fd;
     info.m_handler = _handler;
     info.m_data = _data;
-    info.m_firstInterrupt = true;
+
+    // std::vectors are not thread safe, so need to lock
+    // if we will be adding or removing while thread is running
+    // (should not really affect performance much)
+    if (m_started)
+        pthread_mutex_lock (&m_mutexFds);
 
     // Check if a pollfd struct already exists for this fd
     bool exists = false;
@@ -97,12 +111,21 @@ void BBBIntThread::registerListener (int32_t _fd, IntHandler _handler, void* _da
 
     // Add interrupt info to map of fds to infos
     m_fdInfoMap[_fd].push_back(info);
+
+    if (m_started)
+        pthread_mutex_unlock (&m_mutexFds);
 }
 
 void BBBIntThread::unregisterListener (int32_t _fd, IntHandler _handler)
 {
     // This function may be inefficient, but we do not expect it to happen often
     // and the data structures are not expected to be large
+
+    // std::vectors are not thread safe, so need to lock
+    // if we will be adding or removing while thread is running
+    // (should not really affect performance much)
+    if (m_started)
+        pthread_mutex_lock (&m_mutexFds);
 
     // Find the interrupt info for this handler in the list
     // of handlers for this fd
@@ -127,6 +150,9 @@ void BBBIntThread::unregisterListener (int32_t _fd, IntHandler _handler)
         if (toDel != m_fds.end())
             m_fds.erase(toDel);
     }
+
+    if (m_started)
+        pthread_mutex_unlock (&m_mutexFds);
 }
 
 void* BBBIntThread::threadMain(void* _data)
@@ -144,6 +170,11 @@ void* BBBIntThread::threadMain(void* _data)
             return NULL;
         }
 
+        // std::vectors are not thread safe, so need to lock
+        // if we will be adding or removing while thread is running
+        // (should not really affect performance much)
+        pthread_mutex_lock (&_this->m_mutexFds);
+
         // Iterate over fds to check for events
         std::vector<struct pollfd>::const_iterator it;
         for (it = _this->m_fds.begin(); it != _this->m_fds.end(); it++)
@@ -158,17 +189,11 @@ void* BBBIntThread::threadMain(void* _data)
                 int32_t fd = it->fd;
                 std::vector<ListenerInfo>::iterator lit;
                 for (lit = _this->m_fdInfoMap[fd].begin(); lit != _this->m_fdInfoMap[fd].end(); lit++)
-                {
-                    // There seems to be this weird quirk that when the program
-                    // starts an interrupt is detected, so will skip it as a
-                    // false positive
-                    if (!lit->m_firstInterrupt)
-                        lit->m_handler(lit->m_data);
-                    else
-                        lit->m_firstInterrupt = false;
-                }
+                    lit->m_handler(lit->m_data);
             }
         }
+
+        pthread_mutex_unlock (&_this->m_mutexFds);
 
         if (_this->m_exit)
             break;

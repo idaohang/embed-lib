@@ -8,7 +8,15 @@ bbb_bmp085_sync_test: $(BBB_BMP085_SYNC_TEST)
 .PHONY: bbb_bmp085_sync_test
 BBB_BMP085_TESTS += bbb_bmp085_sync_test
 
-# Add more tests here
+BBB_BMP085_ASYNC_TEST := $(BINDIR)/bbb_bmp085_async_test
+BBB_BMP085_ASYNC_TEST_OBJECTS := $(BUILDDIR)/bbb_bmp085_async_test.o $(BUILDDIR)/screen.o
+$(BUILDDIR)/bbb_bmp085_async_test.o: $(TESTDIR)/bmp085/async_test/bmp085_async_test.cpp
+	$(CXX) $^ -c -o $@ $(TEST_CPPFLAGS) $(TEST_CXXFLAGS) -DBEAGLEBONEBLACK
+$(BBB_BMP085_ASYNC_TEST): $(BBB_BMP085_ASYNC_TEST_OBJECTS)  embed
+	$(CXX) $(TEST_LDFLAGS) -o $(BBB_BMP085_ASYNC_TEST) $(BBB_BMP085_ASYNC_TEST_OBJECTS) $(TEST_LDLIBS)
+bbb_bmp085_async_test: $(BBB_BMP085_ASYNC_TEST)
+.PHONY: bbb_bmp085_async_test
+BBB_BMP085_TESTS += bbb_bmp085_async_test
 
 bbb_bmp085_tests: $(BBB_BMP085_TESTS)
 BBB_TESTS += $(BBB_BMP085_TESTS)

@@ -14,6 +14,8 @@ BBBGPIO::BBBGPIO(uint8_t _gpio, BBBIntThread* _intThread) :
     m_gpio (_gpio),
     m_pinDir (INVALID),
     m_intThread (_intThread),
+    m_listeners (),
+    m_listenersMutex (),
     m_mode (RISING),
     m_valueFd (-1)
 {
@@ -25,6 +27,9 @@ BBBGPIO::~BBBGPIO()
 
 bool BBBGPIO::init ()
 {
+    if (m_initialized)
+        return true;
+
     // Export GPIO
     int fd;
     if ((fd = open("/sys/class/gpio/export", O_WRONLY)) < 0)
@@ -77,6 +82,9 @@ bool BBBGPIO::init ()
 
 void BBBGPIO::destroy ()
 {
+    if (!m_initialized)
+        return;
+
     // If there are any listeners, get rid of them
     m_listeners.clear();
 
@@ -287,6 +295,15 @@ void BBBGPIO::attachInterrupt (GPIOIntHandler _handler, INT_MODE _mode, void* _d
             fprintf(stderr, "BBBGPIO::attachInterrupt open error: %s\n", strerror(errno));
             return;
         }
+
+        // Initialize the listeners mutex
+        if (pthread_mutex_init (&m_listenersMutex, NULL) != 0)
+        {
+            fprintf(stderr, "BBBGPIO::attachInterrupt pthread_mutex_init error\n");
+            close(m_valueFd);
+            return;
+        }
+
         m_intThread->registerListener (m_valueFd, intHandler, this);
     }
     else if (_mode != m_mode)
@@ -295,8 +312,13 @@ void BBBGPIO::attachInterrupt (GPIOIntHandler _handler, INT_MODE _mode, void* _d
         return;
     }
 
+    // std::map is not thread safe and interrupts occur in another thread
+    pthread_mutex_lock (&m_listenersMutex);
+
     // Add to listeners
     m_listeners[_handler] = _data;
+
+    pthread_mutex_unlock (&m_listenersMutex);
 }
 
 void BBBGPIO::detachInterrupt (GPIOIntHandler _handler)
@@ -316,14 +338,20 @@ void BBBGPIO::detachInterrupt (GPIOIntHandler _handler)
         return;
     }
 
+    // std::map is not thread safe and interrupts occur in another thread
+    pthread_mutex_lock (&m_listenersMutex);
+
     // Remove from listeners
     m_listeners.erase(_handler);
+
+    pthread_mutex_unlock (&m_listenersMutex);
 
     // Check to see if this was the last listener, will unregister
     // with interrupt thread and close fd if so
     if (m_listeners.size() == 0)
     {
         m_intThread->unregisterListener (m_valueFd, intHandler);
+        pthread_mutex_destroy (&m_listenersMutex);
         close(m_valueFd);
         m_valueFd = -1;
     }

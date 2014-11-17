@@ -41,7 +41,6 @@ class BBBIntThread
         int32_t             m_fd;
         IntHandler          m_handler;
         void*               m_data;
-        bool                m_firstInterrupt;
     } ListenerInfo;
 
     static const int32_t MAX_BUF = 64;
@@ -54,6 +53,7 @@ class BBBIntThread
     std::vector<struct pollfd>                      m_fds;
     // What to call for a given fd with interrupt
     std::map<int32_t, std::vector<ListenerInfo> >   m_fdInfoMap;
+    pthread_mutex_t                                 m_mutexFds;
 
 };
 
