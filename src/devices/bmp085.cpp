@@ -183,6 +183,17 @@ void BMP085::calcApproxAlt (double _pressurehPa, double* _absAltM)
     (*_absAltM) = 44330.0 * (1.0 - pow (_pressurehPa / PRESSURE_SEA_LEVEL_HPA, 1 / 5.255));
 }
 
+void BMP085::calcExactAlt (double _pressurehPa, double _seaLevelhPa, double* _absAltM)
+{
+    (*_absAltM) = 44330.0 * (1.0 - pow (_pressurehPa / _seaLevelhPa, 1 / 5.255));
+}
+
+void BMP085::calcSeaLevelPress (double _pressurehPa, double _absAltM, double* _seaLevelPress)
+{
+
+    (*_seaLevelPress) = _pressurehPa / pow(1.0 - (_absAltM / 44330.0), 5.255);
+}
+
 void BMP085::eocIntHandler (void * _data)
 {
     BMP085* _this = static_cast<BMP085*>(_data);

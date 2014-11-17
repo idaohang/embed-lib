@@ -59,6 +59,8 @@ class BMP085
     void calcTempPressure (const int16_t _rawTemp, const int32_t _rawPressure,
                            double* _tempC, double* _pressurehPa);
     void calcApproxAlt (double _pressurehPa, double* _absAltM);
+    void calcExactAlt (double _pressurehPa, double _seaLevelhPa, double* _absAltM);
+    void calcSeaLevelPress (double _pressurehPa, double _absAltM, double* _seaLevelPress);
  private:
     // Device parameters
     static const uint8_t ADDRESS        = 0x77;
